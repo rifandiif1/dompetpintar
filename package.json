@@ -1,0 +1,16 @@
+{
+  "name": "smart-finance-manager",
+  "version": "1.0.0",
+  "description": "Aplikasi Pencatat Keuangan & Auto Budgeting Gaji",
+  "main": "www/index.html",
+  "scripts": {
+    "build": "echo 'Static files in www ready'"
+  },
+  "dependencies": {
+    "@capacitor/android": "^6.0.0",
+    "@capacitor/core": "^6.0.0"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^6.0.0"
+  }
+}

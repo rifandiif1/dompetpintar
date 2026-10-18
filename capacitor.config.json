@@ -1,0 +1,6 @@
+{
+  "appId": "com.keuangan.smartbudget",
+  "appName": "DompetPintar",
+  "webDir": "www",
+  "bundledWebRuntime": false
+}

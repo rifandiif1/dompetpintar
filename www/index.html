@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>DompetPintar - Pengelola Keuangan & Gaji</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <header class="app-header">
+    <div>
+      <h1>DompetPintar</h1>
+      <p class="subtitle">Kelola Gaji & Budget Bulanan Otomatis</p>
+    </div>
+    <div class="month-selector">
+      <input type="month" id="currentMonth" />
+    </div>
+  </header>
+
+  <main class="container">
+    <!-- Ringkasan Saldo Utama -->
+    <section class="summary-card">
+      <div class="main-balance">
+        <span>Total Sisa Saldo Bulan Ini</span>
+        <h2 id="totalRemainingBalance">Rp 0</h2>
+      </div>
+      <div class="summary-grid">
+        <div class="summary-item income">
+          <span>Total Gaji / Pemasukan</span>
+          <strong id="totalIncomeDisplay">Rp 0</strong>
+        </div>
+        <div class="summary-item expense">
+          <span>Total Pengeluaran</span>
+          <strong id="totalExpenseDisplay">Rp 0</strong>
+        </div>
+      </div>
+    </section>
+
+    <!-- Navigasi Tab -->
+    <nav class="tab-nav">
+      <button class="tab-btn active" data-tab="tab-budget">Alokasi Gaji</button>
+      <button class="tab-btn" data-tab="tab-transaksi">Catat Transaksi</button>
+      <button class="tab-btn" data-tab="tab-riwayat">Riwayat & Data</button>
+      <button class="tab-btn" data-tab="tab-pengaturan">Rasio</button>
+    </nav>
+
+    <!-- TAB 1: ALOKASI GAJI & POS BUDGET -->
+    <section id="tab-budget" class="tab-content active">
+      <div class="card">
+        <h3>Input Gaji Bulanan</h3>
+        <p class="helper-text">Masukkan gaji Anda untuk otomatis membagi saldo ke 5 pos anggaran bulan ini.</p>
+        <form id="salaryForm">
+          <div class="form-group">
+            <label for="salaryInput">Nominal Gaji / Pemasukan Utama (Rp)</label>
+            <input type="number" id="salaryInput" placeholder="Contoh: 10000000" required min="1" />
+          </div>
+          <div class="form-group">
+            <label for="salaryNote">Catatan (Opsional)</label>
+            <input type="text" id="salaryNote" placeholder="Contoh: Gaji Bulan Ini + Bonus" />
+          </div>
+          <div class="checkbox-group">
+            <input type="checkbox" id="carryOverCheck" checked />
+            <label for="carryOverCheck">Tambahkan ke sisa budget yang sudah ada di bulan ini</label>
+          </div>
+          <button type="submit" class="btn btn-primary">Hitung & Alokasikan Otomatis</button>
+        </form>
+      </div>
+
+      <div class="section-title">
+        <h3>Status Pos Budget Bulan Ini</h3>
+      </div>
+      <div id="budgetCardsContainer" class="budget-list">
+        <!-- Di-render via JS -->
+      </div>
+    </section>
+
+    <!-- TAB 2: CATAT TRANSAKSI (PENGELUARAN / PEMASUKAN TAMBAHAN) -->
+    <section id="tab-transaksi" class="tab-content">
+      <div class="card">
+        <h3>Catat Transaksi Baru</h3>
+        <form id="transactionForm">
+          <div class="form-group">
+            <label for="txType">Jenis Transaksi</label>
+            <select id="txType" required>
+              <option value="expense">Pengeluaran (Potong Pos Budget)</option>
+              <option value="income_split">Pemasukan Tambahan (Bagi Otomatis ke 5 Pos)</option>
+              <option value="income_single">Pemasukan ke 1 Pos Spesifik</option>
+            </select>
+          </div>
+
+          <div class="form-group" id="categoryGroup">
+            <label for="txCategory">Pilih Pos Anggaran</label>
+            <select id="txCategory" required>
+              <option value="pokok">Kebutuhan Pokok (20%)</option>
+              <option value="tagihan">Tagihan (40%)</option>
+              <option value="investasi">Investasi (20%)</option>
+              <option value="darurat">Dana Darurat (10%)</option>
+              <option value="shodaqoh">Shodaqoh (10%)</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="txAmount">Nominal (Rp)</label>
+            <input type="number" id="txAmount" placeholder="Contoh: 50000" required min="1" />
+          </div>
+
+          <div class="form-group">
+            <label for="txDate">Tanggal</label>
+            <input type="date" id="txDate" required />
+          </div>
+
+          <div class="form-group">
+            <label for="txDesc">Keterangan Transaksi</label>
+            <input type="text" id="txDesc" placeholder="Contoh: Beli beras & lauk / Bayar Listrik" required />
+          </div>
+
+          <button type="submit" class="btn btn-success">Simpan Transaksi</button>
+        </form>
+      </div>
+    </section>
+
+    <!-- TAB 3: RIWAYAT & KELOLA DATA -->
+    <section id="tab-riwayat" class="tab-content">
+      <div class="card">
+        <div class="filter-header">
+          <h3>Riwayat Transaksi</h3>
+          <select id="filterCategory">
+            <option value="all">Semua Pos</option>
+            <option value="gaji">Alokasi Gaji</option>
+            <option value="pokok">Kebutuhan Pokok</option>
+            <option value="tagihan">Tagihan</option>
+            <option value="investasi">Investasi</option>
+            <option value="darurat">Dana Darurat</option>
+            <option value="shodaqoh">Shodaqoh</option>
+          </select>
+        </div>
+        <div id="transactionList" class="tx-list">
+          <!-- Di-render via JS -->
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Kelola Data & Laporan</h3>
+        <p class="helper-text">Unduh laporan CSV untuk dibuka di Excel, atau cadangkan data aplikasi.</p>
+        <div class="action-buttons">
+          <button id="exportCsvBtn" class="btn btn-outline">Ekspor CSV (Excel)</button>
+          <button id="backupJsonBtn" class="btn btn-outline">Backup Data (.json)</button>
+          <label for="restoreJsonInput" class="btn btn-outline file-label">Restore Data (.json)</label>
+          <input type="file" id="restoreJsonInput" accept=".json" style="display:none" />
+          <button id="resetMonthBtn" class="btn btn-danger">Reset Data Bulan Ini</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 4: PENGATURAN RASIO -->
+    <section id="tab-pengaturan" class="tab-content">
+      <div class="card">
+        <h3>Pengaturan Rasio Auto-Budget</h3>
+        <p class="helper-text">Default: Pokok 0.2 (20%), Tagihan 0.4 (40%), Investasi 0.2 (20%), Dana Darurat 0.1 (10%), Shodaqoh 0.1 (10%). Total harus = 1.0 (100%).</p>
+        <form id="ratioForm">
+          <div class="ratio-grid">
+            <div class="form-group">
+              <label>Kebutuhan Pokok</label>
+              <input type="number" step="0.01" id="ratio_pokok" required />
+            </div>
+            <div class="form-group">
+              <label>Tagihan</label>
+              <input type="number" step="0.01" id="ratio_tagihan" required />
+            </div>
+            <div class="form-group">
+              <label>Investasi</label>
+              <input type="number" step="0.01" id="ratio_investasi" required />
+            </div>
+            <div class="form-group">
+              <label>Dana Darurat</label>
+              <input type="number" step="0.01" id="ratio_darurat" required />
+            </div>
+            <div class="form-group">
+              <label>Shodaqoh</label>
+              <input type="number" step="0.01" id="ratio_shodaqoh" required />
+            </div>
+          </div>
+          <div class="Action-row">
+            <button type="submit" class="btn btn-primary">Simpan Rasio</button>
+            <button type="button" id="resetRatioBtn" class="btn btn-outline">Kembalikan Default</button>
+          </div>
+        </form>
+      </div>
+    </section>
+  </main>
+
+  <div id="toast" class="toast">Berhasil disimpan!</div>
+  <script src="js/app.js"></script>
+</body>
+</html>
