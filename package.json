@@ -1,7 +1,7 @@
 {
-  "name": "smart-finance-manager",
-  "version": "1.0.0",
-  "description": "Aplikasi Pencatat Keuangan & Auto Budgeting Gaji",
+  "name": "dompet-pintar-pro",
+  "version": "2.0.0",
+  "description": "Aplikasi Pencatat Keuangan Pro, Pos Pengeluaran & Auto Budgeting Gaji",
   "main": "www/index.html",
   "scripts": {
     "build": "echo 'Static files in www ready'"
