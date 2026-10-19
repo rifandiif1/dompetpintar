@@ -1,7 +1,7 @@
 {
-  "name": "dompet-pintar-pro",
-  "version": "2.0.0",
-  "description": "Aplikasi Pencatat Keuangan Pro, Pos Pengeluaran & Auto Budgeting Gaji",
+  "name": "dompet-pintar-v3",
+  "version": "3.0.0",
+  "description": "Aplikasi Pencatat Keuangan Ramah Pemula & Custom Ratio",
   "main": "www/index.html",
   "scripts": {
     "build": "echo 'Static files in www ready'"

@@ -1,6 +1,6 @@
 {
-  "appId": "com.keuangan.dompetpintarpro",
-  "appName": "DompetPintar Pro",
+  "appId": "com.keuangan.dompetpintarv3",
+  "appName": "DompetPintar",
   "webDir": "www",
   "bundledWebRuntime": false
 }
