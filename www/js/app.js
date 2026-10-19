@@ -6,7 +6,7 @@ const DEFAULT_CATEGORIES = [
   { id: "shodaqoh", label: "Shodaqoh", ratio: 0.1, icon: "🤲", color: "#0d9488" }
 ];
 
-const STORAGE_KEY = "dompet_pintar_v3_storage";
+const STORAGE_KEY = "dompet_pintar_v4_storage";
 
 let appData = {
   darkMode: false,
@@ -15,6 +15,12 @@ let appData = {
   goals: [],
   months: {}
 };
+
+// State untuk CamScanner Struk
+let rawReceiptImage = null;
+let currentScanFilter = "magic";
+let currentScanRotation = 0;
+let currentScannedDataUrl = null;
 
 function getNowMonthStr() {
   const d = new Date();
@@ -48,7 +54,7 @@ function getCatById(id) {
 }
 
 function loadStorage() {
-  const raw = localStorage.getItem(STORAGE_KEY);
+  const raw = localStorage.getItem(STORAGE_KEY) || localStorage.getItem("dompet_pintar_v3_storage");
   if (raw) {
     try {
       const p = JSON.parse(raw);
@@ -68,7 +74,11 @@ function loadStorage() {
 }
 
 function saveStorage() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(appData));
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(appData));
+  } catch (e) {
+    alert("Penyimpanan lokal penuh! Anda bisa menghapus struk lama atau melakukan Backup JSON.");
+  }
 }
 
 function ensureMonth(monthKey) {
@@ -134,6 +144,196 @@ function switchTab(tabId) {
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
+/* ================== MESIN CAMSCANNER STRUK ================== */
+function renderCamScannerCanvas() {
+  if (!rawReceiptImage) return;
+  const canvas = document.getElementById("scannerCanvas");
+  const ctx = canvas.getContext("2d");
+
+  // Batasi ukuran maksimum 850px agar tajam tapi hemat memori LocalStorage
+  const MAX_DIM = 850;
+  let w = rawReceiptImage.width;
+  let h = rawReceiptImage.height;
+  if (w > h && w > MAX_DIM) {
+    h = Math.round((h * MAX_DIM) / w);
+    w = MAX_DIM;
+  } else if (h >= w && h > MAX_DIM) {
+    w = Math.round((w * MAX_DIM) / h);
+    h = MAX_DIM;
+  }
+
+  const rot = ((currentScanRotation % 360) + 360) % 360;
+  if (rot === 90 || rot === 270) {
+    canvas.width = h;
+    canvas.height = w;
+  } else {
+    canvas.width = w;
+    canvas.height = h;
+  }
+
+  ctx.save();
+  ctx.translate(canvas.width / 2, canvas.height / 2);
+  ctx.rotate((rot * Math.PI) / 180);
+  ctx.drawImage(rawReceiptImage, -w / 2, -h / 2, w, h);
+  ctx.restore();
+
+  if (currentScanFilter === "original") return;
+
+  const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const d = imgData.data;
+  const strength = Number(document.getElementById("contrastSlider").value) || 60;
+
+  // Hitung rata-rata pencahayaan gambar untuk pemutih kertas adaptif
+  let totalLum = 0;
+  const pixelCount = d.length / 4;
+  for (let i = 0; i < d.length; i += 16) {
+    totalLum += 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+  }
+  const avgLum = totalLum / (pixelCount / 4);
+
+  for (let i = 0; i < d.length; i += 4) {
+    const r = d[i];
+    const g = d[i + 1];
+    const b = d[i + 2];
+    const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+
+    if (currentScanFilter === "gray") {
+      // Grayscale dengan penguatan kontras
+      const factor = 1 + (strength / 100) * 1.2;
+      let val = (lum - 128) * factor + 138;
+      val = Math.max(0, Math.min(255, val));
+      d[i] = d[i + 1] = d[i + 2] = val;
+    } else if (currentScanFilter === "bw") {
+      // Dokumen Hitam-Putih Tajam (Threshold seperti mesin fotokopi/scanner)
+      const thresh = avgLum * (0.72 + (strength / 100) * 0.32);
+      const val = lum > thresh ? 255 : (lum < thresh * 0.75 ? 0 : 40);
+      d[i] = d[i + 1] = d[i + 2] = val;
+    } else if (currentScanFilter === "magic") {
+      // CamScanner Magic Color: Kertas kusam diputihkan, teks & cap warna dipertahankan tajam
+      const whitePoint = avgLum * (1.08 - (strength / 100) * 0.22);
+      const blackPoint = avgLum * (0.42 + (strength / 100) * 0.18);
+
+      if (lum >= whitePoint) {
+        // Putih bersih untuk area kertas struk
+        d[i] = 255;
+        d[i + 1] = 255;
+        d[i + 2] = 255;
+      } else if (lum <= blackPoint) {
+        // Gelapkan tinta teks agar tajam terbaca
+        const darken = 0.35;
+        d[i] = Math.max(0, r * darken);
+        d[i + 1] = Math.max(0, g * darken);
+        d[i + 2] = Math.max(0, b * darken);
+      } else {
+        // Area transisi diperkuat saturasi & kontrasnya
+        const norm = (lum - blackPoint) / Math.max(1, whitePoint - blackPoint);
+        const boost = norm * 255;
+        d[i] = Math.min(255, (r / Math.max(1, lum)) * boost);
+        d[i + 1] = Math.min(255, (g / Math.max(1, lum)) * boost);
+        d[i + 2] = Math.min(255, (b / Math.max(1, lum)) * boost);
+      }
+    }
+  }
+
+  ctx.putImageData(imgData, 0, 0);
+}
+
+function initScannerStudio() {
+  const fileInp = document.getElementById("receiptFileInput");
+  const modal = document.getElementById("scannerModal");
+  const slider = document.getElementById("contrastSlider");
+  const sliderLbl = document.getElementById("contrastValLabel");
+
+  fileInp.addEventListener("change", (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const img = new Image();
+      img.onload = () => {
+        rawReceiptImage = img;
+        currentScanRotation = 0;
+        currentScanFilter = "magic";
+        document.querySelectorAll(".filter-chip").forEach(c => {
+          c.classList.toggle("active", c.getAttribute("data-filter") === "magic");
+        });
+        modal.style.display = "flex";
+        renderCamScannerCanvas();
+      };
+      img.src = ev.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+
+  document.querySelectorAll(".filter-chip").forEach(btn => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll(".filter-chip").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      currentScanFilter = btn.getAttribute("data-filter");
+      renderCamScannerCanvas();
+    });
+  });
+
+  slider.addEventListener("input", () => {
+    sliderLbl.textContent = `${slider.value}%`;
+    renderCamScannerCanvas();
+  });
+
+  document.getElementById("rotateScanBtn").addEventListener("click", () => {
+    currentScanRotation = (currentScanRotation + 90) % 360;
+    renderCamScannerCanvas();
+  });
+
+  const closeScanner = () => {
+    modal.style.display = "none";
+    fileInp.value = "";
+  };
+
+  document.getElementById("closeScannerModalBtn").addEventListener("click", closeScanner);
+  document.getElementById("cancelScanBtn").addEventListener("click", closeScanner);
+
+  document.getElementById("applyScanBtn").addEventListener("click", () => {
+    const canvas = document.getElementById("scannerCanvas");
+    currentScannedDataUrl = canvas.toDataURL("image/jpeg", 0.72);
+    document.getElementById("receiptThumbImg").src = currentScannedDataUrl;
+    document.getElementById("receiptAttachedPreview").style.display = "flex";
+    modal.style.display = "none";
+    showToast("✨ Struk berhasil diproses dengan CamScanner!");
+  });
+
+  document.getElementById("reEditReceiptBtn").addEventListener("click", () => {
+    if (rawReceiptImage) {
+      modal.style.display = "flex";
+      renderCamScannerCanvas();
+    }
+  });
+
+  document.getElementById("removeReceiptBtn").addEventListener("click", () => {
+    currentScannedDataUrl = null;
+    rawReceiptImage = null;
+    document.getElementById("receiptAttachedPreview").style.display = "none";
+    fileInp.value = "";
+    showToast("Lampiran struk dihapus");
+  });
+
+  // Modal Lihat Struk Penuh
+  document.getElementById("closeViewReceiptBtn").addEventListener("click", () => {
+    document.getElementById("viewReceiptModal").style.display = "none";
+  });
+}
+
+function openReceiptViewer(tx) {
+  if (!tx.receiptImage) return;
+  document.getElementById("viewReceiptTitle").textContent = `🧾 ${tx.description}`;
+  document.getElementById("viewReceiptMeta").textContent = `Tanggal: ${tx.date} • Nominal: ${formatRp(tx.amount)}`;
+  document.getElementById("fullReceiptViewImg").src = tx.receiptImage;
+  const dl = document.getElementById("downloadReceiptLink");
+  dl.href = tx.receiptImage;
+  dl.download = `Struk-${tx.date}-${tx.description.replace(/[^a-zA-Z0-9]/g, "_")}.jpg`;
+  document.getElementById("viewReceiptModal").style.display = "flex";
+}
+
+/* ================== RENDER & LOGIKA UTAMA ================== */
 function populateCategoryDropdowns() {
   const ids = ["subPostCategory", "txCategory", "transferFrom", "transferTo"];
   ids.forEach(selId => {
@@ -152,7 +352,6 @@ function populateCategoryDropdowns() {
     }
   });
 
-  // Filter dropdowns
   const filterSub = document.getElementById("filterSubPostCat");
   filterSub.innerHTML = `<option value="all">Semua Pos</option>`;
   const filterHist = document.getElementById("filterCategory");
@@ -203,7 +402,6 @@ function renderAll() {
   document.getElementById("totalIncomeDisplay").textContent = formatRp(totalAlloc);
   document.getElementById("totalExpenseDisplay").textContent = formatRp(totalSpent);
 
-  // Batas aman harian
   const now = new Date();
   const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
   const remDays = Math.max(1, daysInMonth - now.getDate() + 1);
@@ -226,7 +424,6 @@ function renderAll() {
     badge.style.background = "#dc2626";
   }
 
-  // Render Kartu Pos Anggaran
   const container = document.getElementById("budgetCardsContainer");
   container.innerHTML = "";
   const totalRatioSum = appData.categories.reduce((acc, c) => acc + Number(c.ratio || 0), 0);
@@ -258,7 +455,7 @@ function renderAll() {
         <div class="bar-fill" style="width:${pct}%; background:${barColor}"></div>
       </div>
       <div class="b-actions">
-        <button data-qcat="${c.id}" data-qmode="expense">📤 Pakai Uang</button>
+        <button data-qcat="${c.id}" data-qmode="expense">📤 Pakai Uang / Scan Struk</button>
         <button data-qcat="${c.id}" data-qmode="income_single">📥 + Tambah Uang</button>
       </div>
     `;
@@ -295,7 +492,6 @@ function updateTxCategoryHint() {
   document.getElementById("selectedCatRemaining").textContent =
     `Sisa uang di pos ${c.label}: ${formatRp(rem)}`;
 
-  // Update dropdown subpost
   const subSel = document.getElementById("txSubPostId");
   subSel.innerHTML = `<option value="">-- Tidak dikaitkan (Pengeluaran langsung) --</option>`;
   m.subPosts.filter(sp => sp.category === catId).forEach(sp => {
@@ -312,7 +508,7 @@ function renderSubPosts(monthKey) {
 
   const list = m.subPosts.filter(sp => filterCat === "all" || sp.category === filterCat);
   if (list.length === 0) {
-    box.innerHTML = `<div class="card"><p class="helper" style="text-align:center;margin:0;">Belum ada rencana pos pengeluaran di bulan ini. Silakan buat di formulir atas.</p></div>`;
+    box.innerHTML = `<div class="card"><p class="helper" style="text-align:center;margin:0;">Belum ada rencana pos pengeluaran di bulan ini.</p></div>`;
     return;
   }
 
@@ -338,7 +534,7 @@ function renderSubPosts(monthKey) {
         <div class="bar-fill" style="width:${pct}%; background:${c.color}"></div>
       </div>
       <div class="b-actions">
-        <button class="sp-pay" data-id="${sp.id}" style="background:var(--danger);color:#fff;border:none;">📤 Bayar / Pakai</button>
+        <button class="sp-pay" data-id="${sp.id}" style="background:var(--danger);color:#fff;border:none;">📤 Bayar Pos Ini</button>
         <button class="sp-topup" data-id="${sp.id}" style="background:var(--success);color:#fff;border:none;">📥 + Tambah Dana</button>
         <button class="sp-del" data-id="${sp.id}" style="flex:0 0 42px;">🗑️</button>
       </div>
@@ -351,7 +547,7 @@ function renderSubPosts(monthKey) {
       const sp = m.subPosts.find(s => s.id === btn.getAttribute("data-id"));
       if (!sp) return;
       const defVal = Math.max(0, sp.budget - (sp.spent || 0)) || sp.budget;
-      const inp = prompt(`Berapa nominal pembayaran untuk "${sp.title}"? (Rp)`, defVal);
+      const inp = prompt(`Nominal pembayaran untuk "${sp.title}" (Rp):`, defVal);
       if (!inp) return;
       const amount = Number(inp);
       if (isNaN(amount) || amount <= 0) return alert("Nominal tidak valid!");
@@ -367,7 +563,7 @@ function renderSubPosts(monthKey) {
       });
       saveStorage();
       renderAll();
-      showToast(`Pengeluaran "${sp.title}" tercatat & memotong saldo!`);
+      showToast(`Pengeluaran "${sp.title}" berhasil dicatat!`);
     });
   });
 
@@ -375,7 +571,7 @@ function renderSubPosts(monthKey) {
     btn.addEventListener("click", () => {
       const sp = m.subPosts.find(s => s.id === btn.getAttribute("data-id"));
       if (!sp) return;
-      const inp = prompt(`Masukkan tambahan dana untuk "${sp.title}" (Rp):`, "50000");
+      const inp = prompt(`Tambahan dana untuk "${sp.title}" (Rp):`, "50000");
       if (!inp) return;
       const amount = Number(inp);
       if (isNaN(amount) || amount <= 0) return alert("Nominal tidak valid!");
@@ -392,7 +588,7 @@ function renderSubPosts(monthKey) {
       });
       saveStorage();
       renderAll();
-      showToast(`Dana berhasil ditambahkan ke pos "${sp.title}"!`);
+      showToast(`Dana ditambahkan ke pos "${sp.title}"!`);
     });
   });
 
@@ -423,7 +619,7 @@ function renderRatioEditor() {
         <input type="number" step="0.01" min="0" max="1" class="ratio-edit-input" data-id="${c.id}" value="${c.ratio}" />
         <span class="pct-label">(${Math.round(c.ratio * 100)}%)</span>
       </div>
-      <button type="button" class="del-cat-btn" data-id="${c.id}" title="Hapus Pos Ini">🗑️</button>
+      <button type="button" class="del-cat-btn" data-id="${c.id}">🗑️</button>
     `;
     list.appendChild(row);
   });
@@ -440,22 +636,17 @@ function renderRatioEditor() {
     badge.style.color = Math.abs(sum - 1.0) <= 0.005 ? "#10b981" : "#dc2626";
   };
 
-  list.querySelectorAll(".ratio-edit-input").forEach(inp => {
-    inp.addEventListener("input", updateLiveTotal);
-  });
+  list.querySelectorAll(".ratio-edit-input").forEach(inp => inp.addEventListener("input", updateLiveTotal));
 
   list.querySelectorAll(".del-cat-btn").forEach(btn => {
     btn.addEventListener("click", () => {
-      if (appData.categories.length <= 1) {
-        return alert("Minimal harus ada 1 pos anggaran!");
-      }
+      if (appData.categories.length <= 1) return alert("Minimal harus ada 1 pos anggaran!");
       const id = btn.getAttribute("data-id");
       const cat = getCatById(id);
-      if (confirm(`Hapus pos "${cat.label}" dari daftar rasio?`)) {
+      if (confirm(`Hapus pos "${cat.label}"?`)) {
         appData.categories = appData.categories.filter(c => c.id !== id);
         saveStorage();
         renderAll();
-        showToast(`Pos "${cat.label}" dihapus. Jangan lupa sesuaikan total rasio.`);
       }
     });
   });
@@ -489,7 +680,7 @@ function renderGoals() {
         <div class="bar-fill" style="width:${pct}%; background:#10b981;"></div>
       </div>
       <div class="b-actions">
-        <button class="goal-add" data-id="${g.id}">➕ Tabung Uang</button>
+        <button class="goal-add" data-id="${g.id}">➕ Tabung</button>
         <button class="goal-del" data-id="${g.id}" style="flex:0 0 42px;">🗑️</button>
       </div>
     `;
@@ -507,7 +698,6 @@ function renderGoals() {
       g.saved += v;
       saveStorage();
       renderGoals();
-      showToast("Tabungan target bertambah!");
     });
   });
 
@@ -550,6 +740,10 @@ function renderTransactions(monthKey) {
       catLabel = `${c.icon} ${c.label}`;
     }
 
+    const receiptBtnHtml = tx.receiptImage
+      ? `<button class="view-receipt-btn" data-viewid="${tx.id}">🧾 Lihat Struk</button>`
+      : "";
+
     const item = document.createElement("div");
     item.className = "tx-item";
     item.innerHTML = `
@@ -561,10 +755,18 @@ function renderTransactions(monthKey) {
         <span class="tx-amount ${tx.type === 'transfer' ? '' : (isPlus ? 'plus' : 'minus')}">
           ${tx.type === 'transfer' ? '🔄 ' : (isPlus ? '+' : '-')}${formatRp(tx.amount)}
         </span>
+        ${receiptBtnHtml}
         <button class="del-cat-btn" data-txid="${tx.id}">Hapus</button>
       </div>
     `;
     list.appendChild(item);
+  });
+
+  list.querySelectorAll("button[data-viewid]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const tx = m.transactions.find(t => t.id === btn.getAttribute("data-viewid"));
+      if (tx) openReceiptViewer(tx);
+    });
   });
 
   list.querySelectorAll("button[data-txid]").forEach(btn => {
@@ -573,7 +775,7 @@ function renderTransactions(monthKey) {
       m.transactions = m.transactions.filter(t => t.id !== id);
       saveStorage();
       renderAll();
-      showToast("Transaksi dihapus & saldo dikembalikan");
+      showToast("Transaksi dihapus & saldo disesuaikan");
     });
   });
 }
@@ -585,7 +787,6 @@ function initEvents() {
 
   document.getElementById("txDate").value = getTodayStr();
 
-  // Toggle Tema & Panduan Awam
   document.getElementById("themeToggleBtn").addEventListener("click", () => {
     appData.darkMode = !appData.darkMode;
     document.body.classList.toggle("dark-mode", appData.darkMode);
@@ -596,10 +797,9 @@ function initEvents() {
     appData.hideGuides = !appData.hideGuides;
     document.body.classList.toggle("hide-guides", appData.hideGuides);
     saveStorage();
-    showToast(appData.hideGuides ? "Kotak penjelasan disembunyikan" : "Kotak penjelasan ditampilkan");
+    showToast(appData.hideGuides ? "Panduan disembunyikan" : "Panduan ditampilkan");
   });
 
-  // Navigasi Bawah & Pintasan
   document.querySelectorAll(".nav-btn").forEach(btn => {
     btn.addEventListener("click", () => switchTab(btn.getAttribute("data-tab")));
   });
@@ -615,12 +815,10 @@ function initEvents() {
     document.getElementById("txAmount").focus();
   });
 
-  // Tombol Nominal Cepat (+10rb, +50rb, +1Juta, dll)
   document.querySelectorAll(".chip-add").forEach(chip => {
     chip.addEventListener("click", () => {
       const target = document.getElementById(chip.getAttribute("data-target"));
-      const addVal = Number(chip.getAttribute("data-val")) || 0;
-      target.value = (Number(target.value) || 0) + addVal;
+      target.value = (Number(target.value) || 0) + (Number(chip.getAttribute("data-val")) || 0);
       target.dispatchEvent(new Event("input"));
     });
   });
@@ -635,7 +833,6 @@ function initEvents() {
 
   document.getElementById("salaryInput").addEventListener("input", updateSalaryLivePreview);
 
-  // Tarik Sisa Bulan Lalu
   document.getElementById("btnCarryOver").addEventListener("click", () => {
     const currKey = monthPicker.value;
     const prevKey = getPrevMonthStr(currKey);
@@ -650,9 +847,7 @@ function initEvents() {
       totalRem += r;
     });
 
-    if (totalRem <= 0) {
-      return alert(`Tidak ada sisa saldo positif di bulan sebelumnya (${prevKey}).`);
-    }
+    if (totalRem <= 0) return alert(`Tidak ada sisa saldo positif di bulan lalu (${prevKey}).`);
 
     if (confirm(`Tarik sisa saldo bulan lalu (${prevKey}) sebesar ${formatRp(totalRem)} ke bulan ini?`)) {
       const currM = ensureMonth(currKey);
@@ -667,22 +862,18 @@ function initEvents() {
       });
       saveStorage();
       renderAll();
-      showToast("Sisa saldo bulan lalu berhasil ditarik!");
+      showToast("Sisa saldo bulan lalu ditarik!");
     }
   });
 
-  // Simpan Gaji Bulanan
   document.getElementById("salaryForm").addEventListener("submit", (e) => {
     e.preventDefault();
-    const monthKey = monthPicker.value;
-    const m = ensureMonth(monthKey);
+    const m = ensureMonth(monthPicker.value);
     const amount = Number(document.getElementById("salaryInput").value);
     const note = document.getElementById("salaryNote").value.trim() || "Gaji Bulanan";
     const keepOld = document.getElementById("carryOverCheck").checked;
 
-    if (!keepOld) {
-      m.transactions = m.transactions.filter(t => t.type !== "salary");
-    }
+    if (!keepOld) m.transactions = m.transactions.filter(t => t.type !== "salary");
 
     const breakdown = {};
     appData.categories.forEach(c => {
@@ -707,7 +898,6 @@ function initEvents() {
     showToast("Gaji berhasil dibagi otomatis ke semua pos!");
   });
 
-  // Buat Sub-Pos Pengeluaran
   document.getElementById("subPostForm").addEventListener("submit", (e) => {
     e.preventDefault();
     const m = ensureMonth(monthPicker.value);
@@ -715,24 +905,15 @@ function initEvents() {
     const category = document.getElementById("subPostCategory").value;
     const budget = Number(document.getElementById("subPostBudget").value);
 
-    m.subPosts.push({
-      id: "sp_" + Date.now(),
-      title,
-      category,
-      budget,
-      spent: 0
-    });
+    m.subPosts.push({ id: "sp_" + Date.now(), title, category, budget, spent: 0 });
     saveStorage();
     renderAll();
     document.getElementById("subPostForm").reset();
-    showToast(`Pos pengeluaran "${title}" berhasil dibuat!`);
+    showToast(`Pos pengeluaran "${title}" dibuat!`);
   });
 
-  document.getElementById("filterSubPostCat").addEventListener("change", () => {
-    renderSubPosts(monthPicker.value);
-  });
+  document.getElementById("filterSubPostCat").addEventListener("change", () => renderSubPosts(monthPicker.value));
 
-  // Mode Transaksi Radio
   document.querySelectorAll('input[name="txMode"]').forEach(r => {
     r.addEventListener("change", () => {
       document.querySelectorAll(".mode-card").forEach(mc => mc.classList.remove("active"));
@@ -745,7 +926,7 @@ function initEvents() {
 
   document.getElementById("txCategory").addEventListener("change", updateTxCategoryHint);
 
-  // Simpan Transaksi Manual
+  // Simpan Transaksi (Beserta Hasil Scan Struk jika ada)
   document.getElementById("transactionForm").addEventListener("submit", (e) => {
     e.preventDefault();
     const m = ensureMonth(monthPicker.value);
@@ -763,7 +944,8 @@ function initEvents() {
       subPostId,
       amount,
       date,
-      description: desc
+      description: desc,
+      receiptImage: currentScannedDataUrl || null
     };
 
     if (mode === "income_split") {
@@ -775,20 +957,25 @@ function initEvents() {
 
     m.transactions.push(newTx);
     saveStorage();
-    renderAll();
+
+    // Reset form & state struk
+    currentScannedDataUrl = null;
+    rawReceiptImage = null;
+    document.getElementById("receiptAttachedPreview").style.display = "none";
+    document.getElementById("receiptFileInput").value = "";
     document.getElementById("txAmount").value = "";
     document.getElementById("txDesc").value = "";
-    showToast(mode === "expense" ? "Pengeluaran dicatat & saldo berkurang!" : "Pemasukan dicatat & saldo bertambah!");
+
+    renderAll();
+    showToast(newTx.receiptImage ? "✅ Transaksi & Struk CamScanner tersimpan!" : "✅ Transaksi berhasil disimpan!");
   });
 
-  // Form Pindah Saldo
   document.getElementById("transferForm").addEventListener("submit", (e) => {
     e.preventDefault();
     const m = ensureMonth(monthPicker.value);
     const fromCat = document.getElementById("transferFrom").value;
     const toCat = document.getElementById("transferTo").value;
     const amount = Number(document.getElementById("transferAmount").value);
-
     if (fromCat === toCat) return alert("Pilih pos tujuan yang berbeda!");
 
     m.transactions.push({
@@ -806,7 +993,6 @@ function initEvents() {
     showToast("Saldo berhasil dipindahkan!");
   });
 
-  // Simpan Perubahan Rasio
   document.getElementById("saveRatiosBtn").addEventListener("click", () => {
     const inputs = document.querySelectorAll(".ratio-edit-input");
     let sum = 0;
@@ -818,25 +1004,18 @@ function initEvents() {
     });
 
     if (Math.abs(sum - 1.0) > 0.01) {
-      if (!confirm(`Total rasio saat ini adalah ${sum.toFixed(2)} (bukan 1.00). Ingin sistem menyeimbangkan otomatis agar pas 1.00 (100%)?`)) {
-        return;
-      }
-      // Auto normalize
+      if (!confirm(`Total rasio saat ini ${sum.toFixed(2)}. Seimbangkan otomatis agar pas 1.00 (100%)?`)) return;
       appData.categories.forEach(c => {
         c.ratio = sum > 0 ? Number((updated[c.id] / sum).toFixed(2)) : 0;
       });
     } else {
-      appData.categories.forEach(c => {
-        c.ratio = updated[c.id];
-      });
+      appData.categories.forEach(c => { c.ratio = updated[c.id]; });
     }
-
     saveStorage();
     renderAll();
-    showToast("Pengaturan rasio berhasil disimpan!");
+    showToast("Pengaturan rasio disimpan!");
   });
 
-  // Seimbangkan Otomatis ke 1.0
   document.getElementById("autoNormalizeBtn").addEventListener("click", () => {
     const inputs = document.querySelectorAll(".ratio-edit-input");
     let sum = 0;
@@ -860,36 +1039,31 @@ function initEvents() {
     });
     saveStorage();
     renderAll();
-    showToast("Rasio otomatis diseimbangkan menjadi tepat 1.0 (100%)!");
+    showToast("Rasio diseimbangkan menjadi tepat 1.0 (100%)!");
   });
 
-  // Reset Rasio ke 5 Pos Default
   document.getElementById("resetDefaultRatioBtn").addEventListener("click", () => {
-    if (confirm("Kembalikan daftar pos & rasio ke pengaturan awal (0.2 Pokok, 0.4 Tagihan, 0.2 Investasi, 0.1 Darurat, 0.1 Shodaqoh)?")) {
+    if (confirm("Kembalikan ke 5 pos rasio awal?")) {
       appData.categories = JSON.parse(JSON.stringify(DEFAULT_CATEGORIES));
       saveStorage();
       renderAll();
-      showToast("Rasio dikembalikan ke pengaturan awal!");
+      showToast("Rasio dikembalikan ke awal!");
     }
   });
 
-  // Tambah Kategori Rasio Baru Sendiri
   document.getElementById("addCategoryForm").addEventListener("submit", (e) => {
     e.preventDefault();
     const label = document.getElementById("newCatName").value.trim();
     const ratio = parseFloat(document.getElementById("newCatRatio").value) || 0.05;
     const icon = document.getElementById("newCatIcon").value;
     const color = document.getElementById("newCatColor").value;
-    const id = "pos_" + Date.now();
-
-    appData.categories.push({ id, label, ratio, icon, color });
+    appData.categories.push({ id: "pos_" + Date.now(), label, ratio, icon, color });
     saveStorage();
     renderAll();
     document.getElementById("addCategoryForm").reset();
-    showToast(`Pos baru "${label}" ditambahkan! Silakan klik 'Seimbangkan Otomatis' jika perlu.`);
+    showToast(`Pos "${label}" ditambahkan!`);
   });
 
-  // Target Tabungan
   document.getElementById("goalForm").addEventListener("submit", (e) => {
     e.preventDefault();
     const title = document.getElementById("goalTitle").value.trim();
@@ -898,20 +1072,19 @@ function initEvents() {
     saveStorage();
     renderGoals();
     document.getElementById("goalForm").reset();
-    showToast("Target tabungan ditambahkan!");
+    showToast("Target tabungan dibuat!");
   });
 
-  // Riwayat Filter & Export
   document.getElementById("searchTxInput").addEventListener("input", () => renderTransactions(monthPicker.value));
   document.getElementById("filterCategory").addEventListener("change", () => renderTransactions(monthPicker.value));
 
   document.getElementById("exportCsvBtn").addEventListener("click", () => {
     const key = monthPicker.value;
     const m = ensureMonth(key);
-    let csv = "Tanggal,Jenis,Pos,Keterangan,Nominal\n";
+    let csv = "Tanggal,Jenis,Pos,Keterangan,Nominal,Ada Struk\n";
     m.transactions.forEach(t => {
       const desc = `"${(t.description || "").replace(/"/g, '""')}"`;
-      csv += `${t.date},${t.type},${t.category || ""},${desc},${t.amount}\n`;
+      csv += `${t.date},${t.type},${t.category || ""},${desc},${t.amount},${t.receiptImage ? "Ya" : "Tidak"}\n`;
     });
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const a = document.createElement("a");
@@ -924,7 +1097,7 @@ function initEvents() {
     const blob = new Blob([JSON.stringify(appData, null, 2)], { type: "application/json" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
-    a.download = `Backup-DompetPintar-v3-${getTodayStr()}.json`;
+    a.download = `Backup-DompetPintar-v4-${getTodayStr()}.json`;
     a.click();
   });
 
@@ -939,7 +1112,7 @@ function initEvents() {
           appData = parsed;
           saveStorage();
           renderAll();
-          showToast("Data berhasil dipulihkan!");
+          showToast("Data & Struk berhasil dipulihkan!");
         }
       } catch (err) {
         alert("File Backup tidak valid!");
@@ -950,17 +1123,18 @@ function initEvents() {
 
   document.getElementById("resetMonthBtn").addEventListener("click", () => {
     const key = monthPicker.value;
-    if (confirm(`Yakin ingin menghapus seluruh transaksi pada bulan ${key}?`)) {
+    if (confirm(`Hapus seluruh transaksi & struk pada bulan ${key}?`)) {
       delete appData.months[key];
       saveStorage();
       renderAll();
-      showToast("Data bulan ini telah direset!");
+      showToast("Data bulan ini direset!");
     }
   });
 }
 
 document.addEventListener("DOMContentLoaded", () => {
   loadStorage();
+  initScannerStudio();
   initEvents();
   renderAll();
 });

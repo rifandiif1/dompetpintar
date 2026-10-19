@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>DompetPintar v3 - Mudah & Bisa Tambah Rasio Sendiri</title>
+  <title>DompetPintar v4 - Auto Budget & CamScanner Struk</title>
   <link rel="stylesheet" href="css/style.css" />
 </head>
 <body>
@@ -11,12 +11,12 @@
   <header class="app-header">
     <div class="header-top">
       <div>
-        <span class="badge-ver">Versi 3.0 • Ramah Pemula</span>
+        <span class="badge-ver">v4.0 • +CamScanner Struk</span>
         <h1>DompetPintar</h1>
-        <p class="subtitle">Kelola Gaji, Pos Pengeluaran & Rasio Bebas</p>
+        <p class="subtitle">Kelola Gaji, Pos Pengeluaran & Scan Struk</p>
       </div>
       <div class="header-actions">
-        <button id="toggleGuideBtn" class="icon-btn" title="Tampilkan/Sembunyikan Penjelasan">💡</button>
+        <button id="toggleGuideBtn" class="icon-btn" title="Tampilkan/Sembunyikan Panduan">💡</button>
         <button id="themeToggleBtn" class="icon-btn" title="Mode Gelap/Terang">🌙</button>
         <input type="month" id="currentMonth" class="month-picker" />
       </div>
@@ -44,7 +44,7 @@
       </div>
 
       <div class="daily-tip">
-        <span>🛡️ Batas Aman Jajan/Belanja Hari Ini:</span>
+        <span>🛡️ Batas Aman Belanja Hari Ini:</span>
         <strong id="dailySafeLimit">Rp 0 / hari</strong>
       </div>
     </div>
@@ -54,32 +54,31 @@
     <!-- ================= TAB 1: BERANDA & GAJI ================= -->
     <section id="tab-home" class="tab-content active">
       <div class="guide-box">
-        <strong>💡 Cara Pakai Halaman Ini (3 Langkah Mudah):</strong>
+        <strong>💡 Cara Pakai Aplikasi (Sangat Mudah):</strong>
         <ol>
-          <li>Masukkan <b>Gaji / Uang Bulanan</b> Anda di kotak bawah, lalu klik <b>Bagi Otomatis</b>.</li>
-          <li>Uang Anda akan langsung terbagi ke pos-pos sesuai angka rasio (misal 0.2 Pokok, 0.4 Tagihan, dst).</li>
-          <li>Klik tombol <b>"📤 Pakai Uang"</b> pada kartu pos di bawah setiap kali Anda belanja atau bayar sesuatu.</li>
+          <li>Masukkan <b>Gaji Bulanan</b> di bawah, lalu klik <b>Hitung & Bagikan</b>.</li>
+          <li>Uang otomatis dibagi ke pos-pos sesuai angka rasio (0.2 Pokok, 0.4 Tagihan, 0.2 Investasi, 0.1 Darurat, 0.1 Shodaqoh, atau pos buatan Anda sendiri).</li>
+          <li>Saat belanja, klik <b>"📤 Pakai Uang"</b> dan Anda juga bisa <b>memfoto struk belanja (otomatis jernih seperti CamScanner)</b>!</li>
         </ol>
       </div>
 
-      <!-- TOMBOL PINTASAN CEPAT -->
       <div class="quick-bar">
         <button class="q-btn" id="btnQuickSalary">💰 Isi Gaji</button>
-        <button class="q-btn" id="btnCarryOver">📥 Tarik Sisa Bulan Lalu</button>
-        <button class="q-btn" id="btnGoRatio">⚙️ Tambah/Ubah Rasio</button>
+        <button class="q-btn" id="btnCarryOver">📥 Tarik Sisa Lalu</button>
+        <button class="q-btn" id="btnGoRatio">⚙️ Tambah Rasio</button>
       </div>
 
-      <!-- FORM INPUT GAJI DENGAN PREVIEW REALTIME -->
-      <div class="card" id="salaryCard">
+      <!-- FORM INPUT GAJI -->
+      <div class="card">
         <div class="card-head">
-          <h3>💰 1. Masukkan Gaji / Pendapatan Bulanan</h3>
-          <span class="tag-pill">Otomatis Dikalikan Rasio</span>
+          <h3>💰 1. Masukkan Gaji / Uang Bulanan</h3>
+          <span class="tag-pill">Otomatis Kali Rasio</span>
         </div>
-        <p class="helper">Ketik jumlah gaji Anda. Sistem otomatis menghitung pembagian saldo untuk setiap pos anggaran Anda.</p>
+        <p class="helper">Ketik gaji Anda untuk langsung melihat simulasi pembagian ke tiap pos anggaran.</p>
 
         <form id="salaryForm">
           <div class="form-group">
-            <label>Berapa Gaji / Uang Masuk Anda Bulan Ini? (Rp)</label>
+            <label>Nominal Gaji / Pemasukan Utama (Rp)</label>
             <input type="number" id="salaryInput" placeholder="Contoh: 5000000" required min="1" />
             <div class="chip-row">
               <button type="button" class="chip-add" data-target="salaryInput" data-val="1000000">+1 Juta</button>
@@ -89,20 +88,19 @@
             </div>
           </div>
 
-          <!-- KOTAK PREVIEW PEMBAGIAN OTOMATIS -->
           <div id="salaryPreviewBox" class="preview-box" style="display:none;">
-            <strong>👀 Simulasi Pembagian Gaji Anda:</strong>
+            <strong>👀 Hasil Pembagian Otomatis:</strong>
             <div id="salaryPreviewList" class="preview-list"></div>
           </div>
 
           <div class="form-group">
             <label>Catatan (Opsional)</label>
-            <input type="text" id="salaryNote" placeholder="Contoh: Gaji Pokok + Tunjangan" />
+            <input type="text" id="salaryNote" placeholder="Contoh: Gaji Bulanan" />
           </div>
 
           <label class="check-row">
             <input type="checkbox" id="carryOverCheck" checked />
-            <span>Tambahkan ke saldo bulan ini (Jangan hapus gaji yang sudah diinput sebelumnya)</span>
+            <span>Tambahkan ke saldo bulan ini (jangan hapus gaji yang sudah diinput)</span>
           </label>
 
           <button type="submit" class="btn btn-primary">⚡ Hitung & Bagikan ke Pos Sekarang</button>
@@ -111,47 +109,42 @@
 
       <!-- DAFTAR POS ANGGARAN -->
       <div class="sec-title">
-        <h3>📊 2. Kantong / Pos Uang Anda Bulan Ini</h3>
+        <h3>📊 2. Saldo Pos Anggaran Bulan Ini</h3>
         <span id="ratioSumBadge" class="mini-badge">Total Rasio: 1.0 (100%)</span>
       </div>
-      <p class="helper" style="margin-top:-6px; margin-bottom:10px;">
-        Setiap pos di bawah ini memiliki saldo masing-masing. Klik <b>Pakai Uang</b> untuk mengurangi, atau <b>+ Tambah Uang</b> jika ada pemasukan tambahan.
-      </p>
       <div id="budgetCardsContainer" class="budget-list"></div>
     </section>
 
     <!-- ================= TAB 2: POS PENGELUARAN (RENCANA BELANJA) ================= -->
     <section id="tab-subpos" class="tab-content">
       <div class="guide-box">
-        <strong>💡 Apa itu "Pos Pengeluaran"?</strong>
-        <p>Di sini Anda bisa mencatat daftar rencana pengeluaran spesifik (misal: <b>Bayar Listrik Rp 250.000</b>, <b>Beli Beras Rp 150.000</b>, <b>Uang Bensin Rp 100.000</b>). Nanti saat dibayar, cukup klik tombol <b>"Bayar"</b> maka saldo pos utama akan otomatis berkurang!</p>
+        <strong>💡 Apa itu Pos Pengeluaran?</strong>
+        <p>Buat daftar pengeluaran rutin/target (seperti <b>Bayar Listrik</b>, <b>Beli Beras</b>, <b>Kuota Internet</b>). Saat dibayar, klik tombol <b>"📤 Bayar"</b> untuk langsung memotong saldo pos utama.</p>
       </div>
 
       <div class="card">
-        <h3>📌 Tambah Rencana / Pos Pengeluaran Baru</h3>
+        <h3>📌 Buat Rencana Pos Pengeluaran</h3>
         <form id="subPostForm">
           <div class="form-group">
             <label>Untuk Pengeluaran Apa?</label>
-            <input type="text" id="subPostTitle" placeholder="Contoh: Bayar Listrik / Kuota Internet / Susu Anak" required />
+            <input type="text" id="subPostTitle" placeholder="Contoh: Bayar Listrik / Belanja Mingguan" required />
           </div>
-
           <div class="form-row">
             <div class="form-group">
-              <label>Ambil Uangnya dari Pos Mana?</label>
+              <label>Ambil dari Pos Utama Mana?</label>
               <select id="subPostCategory" required></select>
             </div>
             <div class="form-group">
-              <label>Jatah / Target Biaya (Rp)</label>
-              <input type="number" id="subPostBudget" placeholder="Contoh: 250000" required min="1" />
+              <label>Anggaran / Target Biaya (Rp)</label>
+              <input type="number" id="subPostBudget" placeholder="Contoh: 300000" required min="1" />
             </div>
           </div>
-
           <button type="submit" class="btn btn-primary">＋ Simpan Pos Pengeluaran</button>
         </form>
       </div>
 
       <div class="sec-title">
-        <h3>🗂️ Daftar Pos Pengeluaran Anda</h3>
+        <h3>🗂️ Daftar Pos Pengeluaran</h3>
         <select id="filterSubPostCat" class="select-sm">
           <option value="all">Semua Pos</option>
         </select>
@@ -159,11 +152,11 @@
       <div id="subPostListContainer" class="subpost-list"></div>
     </section>
 
-    <!-- ================= TAB 3: CATAT TRANSAKSI MANUAL ================= -->
+    <!-- ================= TAB 3: CATAT TRANSAKSI + CAMSCANNER STRUK ================= -->
     <section id="tab-tx" class="tab-content">
       <div class="guide-box">
-        <strong>💡 Kapan Menggunakan Menu Ini?</strong>
-        <p>Gunakan halaman ini setiap kali Anda <b>mengeluarkan uang</b> (belanja, jajan, bayar tagihan) atau saat <b>mendapat uang tambahan</b> (bonus, hadiah, hasil jualan). Saldo akan otomatis berkurang atau bertambah.</p>
+        <strong>💡 Catat Transaksi & Scan Struk Belanja:</strong>
+        <p>Catat pengeluaran atau pemasukan Anda di sini. Anda juga bisa melampirkan <b>Foto Nota/Struk</b> yang otomatis diproses menjadi putih bersih dan tajam seperti <b>CamScanner</b>!</p>
       </div>
 
       <div class="card">
@@ -192,7 +185,7 @@
           </div>
 
           <div class="form-group" id="categoryGroup">
-            <label for="txCategory">2. Pilih Kantong / Pos Anggaran:</label>
+            <label for="txCategory">2. Pilih Pos Anggaran:</label>
             <select id="txCategory" required></select>
             <small class="hint-balance" id="selectedCatRemaining">Sisa saldo pos ini: Rp 0</small>
           </div>
@@ -205,7 +198,7 @@
           </div>
 
           <div class="form-group">
-            <label for="txAmount">3. Berapa Nominal Uangnya? (Rp)</label>
+            <label for="txAmount">3. Nominal Uang (Rp):</label>
             <input type="number" id="txAmount" placeholder="Contoh: 50000" required min="1" />
             <div class="chip-row">
               <button type="button" class="chip-add" data-target="txAmount" data-val="10000">+10rb</button>
@@ -219,7 +212,7 @@
           <div class="form-row">
             <div class="form-group">
               <label for="txDesc">4. Untuk Apa / Keterangan:</label>
-              <input type="text" id="txDesc" placeholder="Contoh: Beli makan siang / Bonus" required />
+              <input type="text" id="txDesc" placeholder="Contoh: Belanja Indomaret / Bayar Token" required />
             </div>
             <div class="form-group">
               <label for="txDate">Tanggal:</label>
@@ -227,27 +220,52 @@
             </div>
           </div>
 
-          <button type="submit" class="btn btn-success">✅ Simpan Transaksi Sekarang</button>
+          <!-- FITUR SCAN STRUK CAMSCANNER -->
+          <div class="receipt-upload-box">
+            <div class="receipt-box-head">
+              <div>
+                <strong>🧾 5. Lampirkan Foto Struk / Nota (Opsional)</strong>
+                <p>Otomatis dijernihkan seperti dokumen CamScanner</p>
+              </div>
+              <label for="receiptFileInput" class="btn-scan-trigger">
+                📸 Scan / Foto Struk
+              </label>
+              <input type="file" id="receiptFileInput" accept="image/*" capture="environment" style="display:none;" />
+            </div>
+
+            <!-- Preview Hasil Scan Struk Sebelum Simpan Transaksi -->
+            <div id="receiptAttachedPreview" class="attached-preview" style="display:none;">
+              <img id="receiptThumbImg" src="" alt="Preview Struk" />
+              <div class="attached-info">
+                <span class="badge-scanned">✨ Sudah Diproses CamScanner</span>
+                <div class="attached-btns">
+                  <button type="button" id="reEditReceiptBtn" class="mini-btn-edit">⚙️ Edit Efek Scan</button>
+                  <button type="button" id="removeReceiptBtn" class="mini-btn-del">🗑️ Hapus Struk</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <button type="submit" class="btn btn-success" style="margin-top:12px;">✅ Simpan Transaksi Sekarang</button>
         </form>
       </div>
 
       <!-- PINDAH SALDO ANTAR POS -->
       <div class="card">
         <h3>🔄 Pindah Saldo Antar Pos</h3>
-        <p class="helper">Jika satu pos kekurangan uang, Anda bisa memindahkan sisa uang dari pos lain ke pos tersebut.</p>
         <form id="transferForm">
           <div class="form-row">
             <div class="form-group">
-              <label>Ambil Dari Pos</label>
+              <label>Dari Pos</label>
               <select id="transferFrom" required></select>
             </div>
             <div class="form-group">
-              <label>Pindahkan Ke Pos</label>
+              <label>Ke Pos</label>
               <select id="transferTo" required></select>
             </div>
           </div>
           <div class="form-group">
-            <label>Nominal yang Dipindahkan (Rp)</label>
+            <label>Nominal Dipindahkan (Rp)</label>
             <input type="number" id="transferAmount" placeholder="Contoh: 100000" required min="1" />
           </div>
           <button type="submit" class="btn btn-outline">🔄 Pindahkan Saldo</button>
@@ -255,24 +273,21 @@
       </div>
     </section>
 
-    <!-- ================= TAB 4: KELOLA RASIO SENDIRI & TARGET ================= -->
+    <!-- ================= TAB 4: ATUR & TAMBAH RASIO SENDIRI ================= -->
     <section id="tab-ratio" class="tab-content">
       <div class="guide-box">
-        <strong>💡 Cara Mengatur & Menambah Rasio Sendiri:</strong>
-        <p>Angka rasio menentukan berapa bagian gaji yang masuk ke pos tersebut. Contoh: <b>0.2</b> artinya <b>20%</b> dari gaji. <br/>Anda bebas <b>mengubah angka</b>, <b>menambah pos rasio baru</b> (seperti Hiburan, Pendidikan, Kurban), atau menghapus pos. Klik tombol <b>"Seimbangkan Otomatis ke 1.0"</b> jika tidak ingin repot menghitung agar totalnya pas 1.0 (100%).</p>
+        <strong>💡 Atur & Tambah Pos Rasio Sendiri:</strong>
+        <p>Ubah angka pengali rasio atau tambahkan pos anggaran baru sesuai kebutuhan Anda. Klik <b>"Seimbangkan Otomatis ke 1.0"</b> agar totalnya selalu pas 100%.</p>
       </div>
 
-      <!-- DAFTAR & EDIT RASIO SAAT INI -->
       <div class="card">
         <div class="card-head">
-          <h3>⚙️ Daftar Pos & AngkaPengali Rasio</h3>
+          <h3>⚙️ Daftar Pos & Angka Pengali Rasio</h3>
           <span id="liveRatioTotalText" class="tag-pill">Total: 1.00 (100%)</span>
         </div>
-        <p class="helper">Ubah angka desimal di bawah ini (misal 0.2 = 20%, 0.15 = 15%, 0.05 = 5%).</p>
-
         <div id="customRatioList" class="ratio-editor-list"></div>
 
-        <div class="btn-stack" style="margin-top:12px;">
+        <div style="margin-top:12px;">
           <button type="button" id="saveRatiosBtn" class="btn btn-primary">💾 Simpan Perubahan Rasio</button>
           <div class="form-row" style="margin-top:8px;">
             <button type="button" id="autoNormalizeBtn" class="btn btn-outline">⚖️ Seimbangkan Otomatis ke 1.0</button>
@@ -281,18 +296,16 @@
         </div>
       </div>
 
-      <!-- FORM TAMBAH POS RASIO BARU -->
       <div class="card">
         <h3>➕ Tambah Pos Rasio Baru Sendiri</h3>
-        <p class="helper">Ingin menambah kantong anggaran baru? Tambahkan di sini, nanti otomatis ikut dihitung saat gaji masuk.</p>
         <form id="addCategoryForm">
           <div class="form-row">
             <div class="form-group">
               <label>Nama Pos Baru</label>
-              <input type="text" id="newCatName" placeholder="Contoh: Hiburan / Anak / Tabungan" required />
+              <input type="text" id="newCatName" placeholder="Contoh: Hiburan / Pendidikan" required />
             </div>
             <div class="form-group">
-              <label>Angka Rasio (Contoh: 0.05 atau 0.1)</label>
+              <label>Angka Rasio (Misal: 0.05 atau 0.1)</label>
               <input type="number" step="0.01" id="newCatRatio" placeholder="0.05" required min="0.01" max="1" />
             </div>
           </div>
@@ -304,53 +317,51 @@
                 <option value="🎮">🎮 Hiburan / Hobi</option>
                 <option value="🎓">🎓 Pendidikan / Anak</option>
                 <option value="🏥">🏥 Kesehatan</option>
-                <option value="🚗">🚗 Transportasi / Kendaraan</option>
+                <option value="🚗">🚗 Kendaraan / Bensin</option>
                 <option value="🏠">🏠 Rumah / Cicilan</option>
                 <option value="✈️">✈️ Liburan / Mudik</option>
                 <option value="🕌">🕌 Ibadah / Kurban</option>
               </select>
             </div>
             <div class="form-group">
-              <label>Pilih Warna Kartu</label>
+              <label>Warna Pos</label>
               <input type="color" id="newCatColor" value="#ec4899" style="height:42px; padding:4px;" />
             </div>
           </div>
-          <button type="submit" class="btn btn-success">＋ Tambahkan ke Daftar Rasio</button>
+          <button type="submit" class="btn btn-success">＋ Tambahkan Pos Rasio</button>
         </form>
       </div>
 
-      <!-- TARGET TABUNGAN IMPIAN -->
       <div class="card">
-        <h3>🏆 Target Tabungan / Barang Impian</h3>
-        <p class="helper">Catat target tabungan jangka panjang Anda (misal: Beli HP Baru, Dana Kurban, Liburan).</p>
+        <h3>🏆 Target Tabungan Impian</h3>
         <form id="goalForm" class="form-row" style="align-items:end;">
           <div class="form-group">
             <label>Nama Target</label>
-            <input type="text" id="goalTitle" placeholder="Contoh: Dana Kurban" required />
+            <input type="text" id="goalTitle" placeholder="Contoh: Beli Laptop / Kurban" required />
           </div>
           <div class="form-group">
-            <label>Target Nominal (Rp)</label>
-            <input type="number" id="goalTarget" placeholder="3500000" required min="1" />
+            <label>Nominal Target (Rp)</label>
+            <input type="number" id="goalTarget" placeholder="5000000" required min="1" />
           </div>
           <div class="form-group">
-            <button type="submit" class="btn btn-primary">＋ Buat Target</button>
+            <button type="submit" class="btn btn-primary">＋ Tambah</button>
           </div>
         </form>
         <div id="goalsList" class="subpost-list" style="margin-top:10px;"></div>
       </div>
     </section>
 
-    <!-- ================= TAB 5: RIWAYAT & LAPORAN EXCEL ================= -->
+    <!-- ================= TAB 5: RIWAYAT & GALERI STRUK ================= -->
     <section id="tab-history" class="tab-content">
       <div class="guide-box">
-        <strong>💡 Riwayat & Cadangan Data:</strong>
-        <p>Semua catatan pemasukan dan pengeluaran tersimpan di HP Anda. Anda bisa mencari transaksi, mengunduh laporan ke <b>Excel (CSV)</b>, atau menyimpan file cadangan (Backup).</p>
+        <strong>💡 Riwayat Transaksi & Struk Belanja:</strong>
+        <p>Transaksi yang memiliki foto struk akan ditandai dengan tombol <b>"🧾 Lihat Struk"</b>. Klik tombol tersebut untuk melihat hasil scan struk secara jelas atau mengunduhnya.</p>
       </div>
 
       <div class="card">
         <h3>📜 Riwayat Transaksi Bulan Ini</h3>
         <div class="filter-bar">
-          <input type="text" id="searchTxInput" placeholder="🔍 Cari nama pengeluaran / pemasukan..." />
+          <input type="text" id="searchTxInput" placeholder="🔍 Cari transaksi..." />
           <select id="filterCategory">
             <option value="all">Semua Pos</option>
             <option value="gaji">Alokasi Gaji</option>
@@ -360,20 +371,74 @@
       </div>
 
       <div class="card">
-        <h3>💾 Unduh Laporan & Cadangkan Data</h3>
+        <h3>💾 Unduh Laporan & Backup Data</h3>
         <div class="action-grid">
           <button id="exportCsvBtn" class="btn btn-outline">📊 Unduh Excel (.CSV)</button>
           <button id="backupJsonBtn" class="btn btn-outline">📦 Backup Data (.JSON)</button>
-          <label for="restoreJsonInput" class="btn btn-outline file-lbl">📂 Pulihkan Data (.JSON)</label>
+          <label for="restoreJsonInput" class="btn btn-outline file-lbl">📂 Restore Data (.JSON)</label>
           <input type="file" id="restoreJsonInput" accept=".json" style="display:none;" />
-          <button id="resetMonthBtn" class="btn btn-danger">🗑️ Hapus Data Bulan Ini</button>
+          <button id="resetMonthBtn" class="btn btn-danger">🗑️ Reset Bulan Ini</button>
         </div>
       </div>
     </section>
   </main>
 
+  <!-- ================= MODAL STUDIO CAMSCANNER STRUK ================= -->
+  <div id="scannerModal" class="modal-overlay" style="display:none;">
+    <div class="scanner-modal-box">
+      <div class="scanner-header">
+        <h3>📸 CamScanner Struk Pintar</h3>
+        <button type="button" id="closeScannerModalBtn" class="close-modal-btn">✕</button>
+      </div>
+      <p class="scanner-sub">Pilih efek scan agar tulisan pada struk/nota tampak putih bersih & tajam.</p>
+
+      <div class="canvas-Stage">
+        <canvas id="scannerCanvas"></canvas>
+      </div>
+
+      <!-- Pilihan Filter CamScanner -->
+      <div class="scanner-filters">
+        <button type="button" class="filter-chip active" data-filter="magic">✨ Magic Color</button>
+        <button type="button" class="filter-chip" data-filter="bw">✒️ Hitam Putih</button>
+        <button type="button" class="filter-chip" data-filter="gray">🌗 Abu-abu</button>
+        <button type="button" class="filter-chip" data-filter="original">🖼️ Foto Asli</button>
+      </div>
+
+      <!-- Pengaturan Ketajaman & Putar -->
+      <div class="scanner-controls">
+        <div class="slider-wrap">
+          <label for="contrastSlider">Ketajaman Teks / Pemutih Kertas: <strong id="contrastValLabel">60%</strong></label>
+          <input type="range" id="contrastSlider" min="10" max="100" value="60" />
+        </div>
+        <button type="button" id="rotateScanBtn" class="btn-rotate">🔄 Putar 90°</button>
+      </div>
+
+      <div class="scanner-footer">
+        <button type="button" id="cancelScanBtn" class="btn btn-outline">Batal</button>
+        <button type="button" id="applyScanBtn" class="btn btn-primary">✅ Gunakan Hasil Scan</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= MODAL LIHAT STRUK PENUH ================= -->
+  <div id="viewReceiptModal" class="modal-overlay" style="display:none;">
+    <div class="scanner-modal-box">
+      <div class="scanner-header">
+        <h3 id="viewReceiptTitle">🧾 Detail Struk Belanja</h3>
+        <button type="button" id="closeViewReceiptBtn" class="close-modal-btn">✕</button>
+      </div>
+      <p id="viewReceiptMeta" class="scanner-sub"></p>
+      <div class="canvas-Stage">
+        <img id="fullReceiptViewImg" src="" alt="Struk Belanja" style="max-width:100%; max-height:65vh; border-radius:8px;" />
+      </div>
+      <div class="scanner-footer" style="margin-top:12px;">
+        <a id="downloadReceiptLink" href="#" download="Struk-Belanja.jpg" class="btn btn-primary" style="text-decoration:none; text-align:center;">⬇️ Unduh Gambar Struk</a>
+      </div>
+    </div>
+  </div>
+
   <!-- TOMBOL MELAYANG TAMBAH TRANSAKSI -->
-  <button class="fab" id="fabQuickAdd" title="Catat Pengeluaran/Pemasukan Cepat">＋</button>
+  <button class="fab" id="fabQuickAdd" title="Catat Transaksi & Scan Struk">＋</button>
 
   <!-- NAVIGASI BAWAH -->
   <nav class="bottom-nav">
@@ -386,8 +451,8 @@
       <span>Pos Keluar</span>
     </button>
     <button class="nav-btn" data-tab="tab-tx">
-      <span class="n-ico">✍️</span>
-      <span>Catat Uang</span>
+      <span class="n-ico">📸</span>
+      <span>Catat & Struk</span>
     </button>
     <button class="nav-btn" data-tab="tab-ratio">
       <span class="n-ico">⚙️</span>

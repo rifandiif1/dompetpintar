@@ -1,7 +1,7 @@
 {
-  "name": "dompet-pintar-v3",
-  "version": "3.0.0",
-  "description": "Aplikasi Pencatat Keuangan Ramah Pemula & Custom Ratio",
+  "name": "dompet-pintar-v4",
+  "version": "4.0.0",
+  "description": "Aplikasi Pencatat Keuangan + CamScanner Struk & Custom Ratio",
   "main": "www/index.html",
   "scripts": {
     "build": "echo 'Static files in www ready'"
